@@ -17,7 +17,7 @@ num_classes = 3
 model = get_instance_segmentation_model(num_classes)
 model.to(device)
 
-model.load_state_dict(torch.load("maskrcnn_best.pth", map_location=device))
+model.load_state_dict(torch.load("maskrcnn_model.pth", map_location=device))
 
 image = read_image(
     "data/test/images/IMG_0013_JPG.rf.2337b56130b71363bd2d44947513d914.jpg")
@@ -31,23 +31,32 @@ with torch.no_grad():
     predictions = model([x, ])
     pred = predictions[0]
 
+print(type(predictions))
+print(predictions)
 
 image = (255.0 * (image - image.min()) /
          (image.max() - image.min())).to(torch.uint8)
 image = image[:3, ...]
+
+score_threshold = 0.5
+keep = pred["scores"] >= score_threshold
+
+pred_boxes = pred["boxes"][keep].long()
+pred_labels_raw = pred["labels"][keep]
+pred_scores = pred["scores"][keep]
+pred_masks = (pred["masks"][keep] > 0.7).squeeze(1)
+
 pred_labels = [
     f"{label_map.get(label.item(), 'unknown')}: {score:.3f}"
-    for label, score in zip(pred["labels"], pred["scores"])
+    for label, score in zip(pred_labels_raw, pred_scores)
 ]
-pred_boxes = pred["boxes"].long()
+
 output_image = draw_bounding_boxes(
     image, pred_boxes, pred_labels, colors="red")
-
-masks = (pred["masks"] > 0.7).squeeze(1)
 output_image = draw_segmentation_masks(
-    output_image, masks, alpha=0.5, colors="blue")
-
+    output_image, pred_masks, alpha=0.5, colors="blue")
 
 plt.figure(figsize=(12, 12))
 plt.imshow(output_image.permute(1, 2, 0))
+plt.axis('off')
 plt.show()
