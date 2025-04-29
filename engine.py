@@ -30,81 +30,8 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         targets = [{k: v.to(device) if isinstance(
             v, torch.Tensor) else v for k, v in t.items()} for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            try:
-                loss_dict = model(images, targets)
-                losses = sum(loss for loss in loss_dict.values())
-            except Exception as err:
-                print('\n\n---------------- Exception ----------------')
-                print(f'Error: {err}')
-
-                import torchvision.transforms.functional as F
-                import matplotlib.pyplot as plt
-                import numpy as np
-                import os
-
-                # Print all filenames in the current batch
-                print("\n--- Current batch filenames ---")
-                for batch_idx, t in enumerate(targets):
-                    filename = t.get("filename", None)
-                    print(f"Batch index {batch_idx}: {filename}")
-                print("--------------------------------\n")
-
-                # Try to extract which index caused the problem
-                problematic_idx = None
-                err_str = str(err)
-                if "at index" in err_str:
-                    try:
-                        problematic_idx = int(
-                            err_str.split("at index")[-1].strip())
-                        print(
-                            f"Problematic sample is at batch index: {problematic_idx}")
-                    except:
-                        print("Couldn't parse index from error message.")
-
-                # Visualize the problematic image and mask
-                if problematic_idx is not None and problematic_idx < len(images):
-                    img = images[problematic_idx].cpu()
-                    img_pil = F.to_pil_image(img)
-
-                    plt.figure(figsize=(12, 6))
-                    plt.subplot(1, 2, 1)
-                    plt.imshow(np.array(img_pil))
-                    plt.title(
-                        f"Image Causing Error\n{targets[problematic_idx].get('filename', '')}")
-                    plt.axis('off')
-
-                    if "masks" in targets[problematic_idx] and len(targets[problematic_idx]["masks"]) > 0:
-                        mask = targets[problematic_idx]["masks"][0].cpu(
-                        ).numpy()
-
-                        plt.subplot(1, 2, 2)
-                        plt.imshow(mask, cmap="gray")
-                        plt.title("Mask Causing Error")
-                        plt.axis('off')
-                    else:
-                        print("No masks found for problematic target!")
-
-                    plt.tight_layout()
-                    plt.show()
-
-                    # Save error samples
-                    error_dir = "error_samples"
-                    os.makedirs(error_dir, exist_ok=True)
-                    img_pil.save(os.path.join(
-                        error_dir, f"error_image_{targets[problematic_idx].get('filename', 'unknown')}.jpg"))
-                    if "masks" in targets[problematic_idx] and len(targets[problematic_idx]["masks"]) > 0:
-                        from PIL import Image
-                        mask_to_save = Image.fromarray(
-                            (mask * 255).astype(np.uint8))
-                        mask_to_save.save(os.path.join(
-                            error_dir, f"error_mask_{targets[problematic_idx].get('filename', 'unknown')}.jpg"))
-
-                    print(f'Error samples saved in {error_dir}/')
-
-                else:
-                    print("Problematic image index not found or out of range.")
-
-                raise err
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
