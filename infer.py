@@ -5,6 +5,11 @@ from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 from model import get_instance_segmentation_model
 from train import get_transform
 
+label_map = {
+    1: "card",
+    2: "damages",
+}
+
 device = torch.device(
     'cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -30,8 +35,10 @@ with torch.no_grad():
 image = (255.0 * (image - image.min()) /
          (image.max() - image.min())).to(torch.uint8)
 image = image[:3, ...]
-pred_labels = [f"pedestrian: {score:.3f}" for label,
-               score in zip(pred["labels"], pred["scores"])]
+pred_labels = [
+    f"{label_map.get(label.item(), 'unknown')}: {score:.3f}"
+    for label, score in zip(pred["labels"], pred["scores"])
+]
 pred_boxes = pred["boxes"].long()
 output_image = draw_bounding_boxes(
     image, pred_boxes, pred_labels, colors="red")
