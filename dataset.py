@@ -39,6 +39,31 @@ class CustomDataset(torch.utils.data.Dataset):
         labels = torch.ones((num_objs,), dtype=torch.int64)
 
         image_id = idx
+
+        boxes = masks_to_boxes(masks)
+
+        height, width = F.get_size(img)  # (height, width)
+
+        # Fix width and height if zero
+        # (xmax <= xmin) => xmax = xmin + 1
+        # (ymax <= ymin) => ymax = ymin + 1
+
+        # Find where width or height is zero
+        widths = boxes[:, 2] - boxes[:, 0]
+        heights = boxes[:, 3] - boxes[:, 1]
+
+        # Create masks for bad boxes
+        bad_width_mask = widths <= 0
+        bad_height_mask = heights <= 0
+
+        # Fix them
+        boxes[bad_width_mask, 2] = boxes[bad_width_mask, 0] + 1
+        boxes[bad_height_mask, 3] = boxes[bad_height_mask, 1] + 1
+
+        # Clamp xmax and ymax to image size
+        boxes[:, 2] = torch.clamp(boxes[:, 2], max=width)
+        boxes[:, 3] = torch.clamp(boxes[:, 3], max=height)
+
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         # suppose all instances are not crowd
         iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
